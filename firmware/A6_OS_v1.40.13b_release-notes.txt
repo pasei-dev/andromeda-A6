@@ -1,0 +1,35 @@
+A6 Beta OS Release Notes
+5/30/02
+Brian Shim
+Alesis
+
+
+Note:  This software is a beta release!!  If you use this software, please understand
+that it is still in the testing stage.  For the official release, see the Alesis
+website.
+
+
+Changes in V1.40.13:
+-------------------
+1.  FIXED SYSEX GLOBAL DATA UPLOAD TO A6 DOESN’T WORK
+Uploading of Global Sysex data should work properly now.
+
+2.  ADDED UPLOAD MESSAGES TO SYSEX UPLOADS OF GLOBAL DATA, PROG, AND MIX EDIT BUFFERS 
+
+
+Changes in V1.40.11:
+-------------------
+1.  FIXED "ENVELOPE NORMAL MODE 2 DOESN'T WORK AS DESCRIBED IN MANUAL"
+Envelope normal mode 2 should work as described in the manual now.
+
+2.  ADDED FILT/OSC ENGINE OPTIMIZER SETTING:  ULTRA FAST
+There is a new engine optimizer setting of ULTRA fast.  This is for extremely percussive
+sounds.  Note that there may be clicks and other artifacts when using this setting, so
+use it only when required.  Also, units with pre-1.40.11 software will "see" this setting 
+as the NORMAL engine optimizer setting.
+
+3.  WHEN TURNING OFF UNISON X USING THE BUTTON, IT WILL REMEMBER THE NUMBER OF UNISON
+    VOICES WHEN TURNING IT BACK ON.
+When you turn off Unison X using the button, it will remember the number of unison
+voices when you turn it back on using the button.  If you turn it on right after
+changing patches, it will default to 2.
