@@ -50,13 +50,13 @@ SysEx payload. `tools/extract_frontpanel_eprom.py` walks it in order:
    Alesis Yahoo group (see [Sources](#sources)).
 2. **Strip the SysEx framing** — collect what sits between `F0` and `F7`; an `F7` followed by
    `00` is a stuffed literal `F7`, part of the message rather than its end.
-3. **Take each message's data** — every payload is 316 bytes and the data region starts 21
-   bytes in.
+3. **Take each message's data** — every payload is 316 bytes and its data region is 296 bytes
+   (37 whole 8-byte groups) starting 21 bytes in.
 4. **Undo the bit packing** — the A6 spreads 7 data bytes over eight 7-bit MIDI words: word 0
    holds bits A6–A0, word 1 holds B5–B0 plus A7, and so on diagonally (this is the packing
    described by the A6 MIDI SysEx specification).
-5. **Pick out the Intel HEX records** — they sit back to back in the decoded stream, separated
-   by NUL bytes. Only records that pass their own Intel checksum are used.
+5. **Pick out the Intel HEX records** — they sit back to back in the decoded stream. A record
+   is placed at the address its header gives, and kept only if its Intel checksum validates.
 6. **Build the 64 KB image** — bytes are placed at the addresses the records give; everything
    else is written `0xFF`, as an erased EPROM reads.
 
@@ -71,17 +71,30 @@ python3 tools/extract_frontpanel_eprom.py --mirror A6_front_panel_eprom_dual.bin
 ```
 
 **Both sources are passed on purpose.** The protocol splices a per-message counter field into
-the record text, which damages about one record in six — 68 of 422 records in the OS file, 63
-of 417 in the bootloader file — and the two are damaged in different places, so each one fills
-the other's holes. Where both carry a record they agree **byte for byte** (5374 bytes, zero
-disagreements), so merging them is not mixing two firmware versions.
+the record text, which clips a few characters out of a record. In each file 13 records lose part
+of their header and 7 lose one character of their text (`--report` prints both counts). Two
+properties make that recoverable:
+
+- the characters *after* the splice survive, so a shortened record still has an intact tail,
+  and the tail can be re-anchored against the record's end;
+- records are emitted back to back in ascending address order, so a record whose header is gone
+  can be placed by the sequence around it.
+
+A record is accepted only when its characters all come from a source and its own Intel checksum
+validates; with both files nothing is left unresolved. They turn out to carry **the same 6862
+bytes of record data, with zero disagreements**, so the second file is a cross-check rather than
+a patch — either one alone reproduces this image byte for byte.
 
 ## What the image contains
 
-- the 8051 reset vector at `0x8000`: `LJMP 0x8100`, then the usual 8-byte vector slots
+- the 8051 vector table the records carry — reset at `0x8000` (`LJMP 0x8100`), `0x8003`, `0x8013`
+  and `0x801B` (`RETI`, i.e. unused), Timer 0 at `0x800B` (`LJMP 0x8ECB`) and Timer 2 at `0x802B`
+  (`LJMP 0x8D4B`). The rest of the vector area is not addressed by any record (see
+  [Limits](#limits-of-this-extraction))
 - init code at `0x8100`: `MOV PSW,#0`, `MOV SP,#0xBA`, `MOV P1,#0x7F`, then MOVX writes to the
   LCD controller
-- a 5x8 LCD character font table (glyphs from roughly `0x9700`)
+- a 5x8 LCD character font table, from about `0x9620` up to the highest addressed byte: 16-byte
+  glyphs, marked off by `00 07 00` at 16-byte intervals
 - the highest byte the records address is `0x9BC1`
 - no display text: the front panel is a **command interpreter** — the Coldfire sends "clear
   display", "draw text" and similar over the serial link, so a front panel with valid firmware
@@ -105,10 +118,12 @@ image problem — a genuine AT27C512 programmed cleanly and read back byte-ident
 
 ## Status: extracted, not verified
 
-**Its shape is verified.** The bytes form valid 8051 code (vector table, init sequence, serial
-setup), the record checksums validate, the same code appears in both official update files, and
-a burn to an AT27C512 verified byte-for-byte on read-back. ALE on the front panel's 87C52 then
-ran at fosc/6 with the chip in its socket, which proves the CPU was fetching from this image.
+**Its shape is verified.** The bytes form valid 8051 code (vector table, init sequence, LCD
+writes, a font table), every record in it passes its own Intel checksum, and the two official
+update files carry the same 6862 bytes with **zero disagreements**. A burn to an AT27C512 of the
+*earlier, wrong* build verified byte-for-byte on read-back, and ALE on the front panel's 87C52
+then ran at fosc/6 with that chip in its socket — so the CPU does fetch front-panel code from
+this socket, though not from these exact bytes.
 
 **Its behaviour is not verified.** It has never been seen to bring a front panel up: no splash,
 no LEDs. The instrument it was tried in had other faults at the time (dead front-panel crystal,
@@ -118,17 +133,22 @@ healthy A6 runs is therefore still open.
 
 ### Limits of this extraction
 
-- **Coverage:** 5790 of the 7106 bytes the records address (`0x8000`–`0x9BC1`) are recovered;
-  the other 1316 bytes are `0xFF`. 62 of the 83 missing 16-byte blocks are visible in the
-  stream but damaged beyond repair; 21 are absent from both files completely (either never
-  emitted because the block is blank, or damaged in their address field). These updates are,
-  strictly, a lossy source for this EPROM.
+- **Coverage:** the records address 6862 bytes, and that covers **everything from `0x8100` to
+  `0x9BC1`** — including the 40 `0xFF` bytes inside that region, which are values the records
+  themselves declare and their checksums cover. The other 244 bytes of `0x8000`–`0x9BC1` (all in
+  `0x8004`–`0x80FF`, the interrupt vector area) are addressed by no record and are written
+  `0xFF`: that is what an erased EPROM reads, but it is not extracted data, and the factory part
+  may well hold `RETI` filler there.
 - **No reference dump.** No known-good copy of the factory EPROM has turned up, so nothing can
-  be compared byte-for-byte; record integrity is judged by the Intel checksum alone.
-- **Superseded build.** An earlier extraction of this image, the one that was actually burned
-  into a chip during the repair, dropped the last data byte of every record (354 bytes) through
-  an off-by-two in the record slice. The files here are the corrected extraction; if you have a
-  chip burned from that older file, its contents differ from these.
+  be compared byte-for-byte; record integrity is judged by the Intel checksum, plus the two
+  sources agreeing on all 6862 bytes.
+- **Superseded builds.** Two earlier extractions of this image were wrong and are not what the
+  files here contain. The one actually burned into a chip during the repair dropped the last
+  data byte of every record (354 bytes) through an off-by-two in the record slice. A later one
+  read only the first 288 bytes of each message's data region instead of 296, losing 1316 bytes
+  of the front-panel code. Both produce images whose records still pass their own checksums, so
+  neither is detectable from the file alone — if you have a chip or a copy from either, replace
+  it.
 
 ## Sources
 
