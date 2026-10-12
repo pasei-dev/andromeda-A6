@@ -21,7 +21,7 @@ image.
 ## Commands
 
 ```sh
-# regenerate both images (both sources at once: each fills the other's damaged records)
+# regenerate both images (both sources: the second is a cross-check, see the README)
 python3 tools/extract_frontpanel_eprom.py A6_front_panel_eprom.bin \
     firmware/A6_OS_v1.40.13b.syx firmware/A6_bootloader_1.20.31.syx
 python3 tools/extract_frontpanel_eprom.py --mirror A6_front_panel_eprom_dual.bin \
@@ -31,8 +31,9 @@ python3 tools/extract_frontpanel_eprom.py --mirror A6_front_panel_eprom_dual.bin
 shasum -a 256 -c SHA256SUMS
 ```
 
-`--report` prints one line per input file. There is no test suite and no build; the check is
-that the two commands above reproduce `SHA256SUMS`.
+`--report` prints one line per input file, including how many records the protocol's splice
+clipped. There is no test suite and no build; the check is that the two commands above reproduce
+`SHA256SUMS`.
 
 ## Git
 
@@ -47,5 +48,5 @@ that the two commands above reproduce `SHA256SUMS`.
 - Ask first: rewriting `firmware/*.syx`, re-deriving the packing assumptions, or shipping a
   third image variant.
 - Never: hand-edit a `.bin`, claim the image "works" or "is the factory EPROM", or describe the
-  `firmware/` files as complete — the updates do not carry every byte of the front-panel code
-  (see the README's coverage note).
+  extraction as lossy — the records cover every addressed byte, and the unaddressed 244 bytes of
+  the vector area are `0xFF` fill, not lost data (see the README's coverage note).
