@@ -83,9 +83,10 @@ Add `--report` to see what each source contributed.
 
 ## What's inside
 
-8051 code you would expect on a display panel: the reset vector at `0x8000` jumping to `0x8100`,
-init code (`MOV PSW,#0`, stack at `0xBA`, LCD writes), interrupt vectors, and a 5x8 character
-font from about `0x9620` up to the last addressed byte at `0x9BC1`.
+8051-family code you would expect on a display panel: the reset vector at `0x8000` jumping to
+`0x8100`, init code (`MOV PSW,#0`, stack at `0xBA`, LCD writes), interrupt vectors (Timer 2 among
+them, which makes it 8052 code, matching the panel's 87C52), and a 5x8 character font from about
+`0x9620` up to the last addressed byte at `0x9BC1`.
 
 There is no startup text or logo in it. The panel is a command interpreter: the main board sends
 "clear display", "draw text" and so on over the serial link. A silent front panel is normal until
